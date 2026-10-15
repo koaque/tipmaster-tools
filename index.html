@@ -3,9 +3,344 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Tipmaster Tools</title>
+<title>Tipp-Rechner</title>
+<meta name="description" content="Aus den 1X2-Quoten den klügsten exakten Tipp für dein Tipmaster-Duell berechnen: Marge raus, Poisson-Modell rein, Ergebnis-Heatmap.">
+<meta property="og:title" content="Tipp-Rechner: der klügste exakte Tipp aus den Quoten">
+<meta property="og:description" content="Quoten eingeben, wahrscheinlichste Ergebnisse und den sichersten Tipp für dein Duell sehen.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Dosis:wght@600;800&family=Plus+Jakarta+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f6f3ea; --surface: #fffdf7; --ink: #1c1a15; --muted: #6b665a;
+  --line: #1c1a15; --line-soft: #ddd6c4;
+  --t1: #f4b400; --tx: #f08a24; --t2: #e2502b; --on-tile: #1c1a15;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14130f; --surface: #1e1c17; --ink: #f2ede0; --muted: #a59f90;
+    --line: #f2ede0; --line-soft: #3b382f;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #14130f; --surface: #1e1c17; --ink: #f2ede0; --muted: #a59f90;
+  --line: #f2ede0; --line-soft: #3b382f;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 16px/1.5 "Plus Jakarta Sans", system-ui, sans-serif;
+}
+main { max-width: 880px; margin: 0 auto; padding: 24px 16px 48px; }
+h1, h2, .big { font-family: Dosis, system-ui, sans-serif; letter-spacing: .01em; }
+h1 { font-size: clamp(32px, 7vw, 48px); line-height: 1; margin: 6px 0 8px; font-weight: 800; }
+h2 { font-size: 20px; margin: 0 0 12px; font-weight: 800; text-transform: uppercase; }
+.kicker { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.lede { color: var(--muted); max-width: 60ch; margin: 0 0 24px; }
+.panel {
+  background: var(--surface); border: 2px solid var(--line); padding: 20px; margin-bottom: 20px;
+  clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%);
+}
+.teams { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: end; margin-bottom: 16px; }
+.teams .sep { font-family: Dosis, sans-serif; font-weight: 800; font-size: 22px; padding-bottom: 8px; }
+label { display: block; font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+input {
+  width: 100%; font: inherit; color: var(--ink); background: var(--bg);
+  border: 2px solid var(--line-soft); border-radius: 2px; padding: 8px 10px;
+}
+input:focus { outline: none; border-color: var(--line); }
+.odds { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.tile { border: 2px solid var(--line); background: var(--bg); }
+.tile .tag {
+  display: block; font-family: Dosis, sans-serif; font-weight: 800; font-size: 22px; text-align: center;
+  color: var(--on-tile); padding: 2px 0;
+}
+.tile:nth-child(1) .tag { background: var(--t1); }
+.tile:nth-child(2) .tag { background: var(--tx); }
+.tile:nth-child(3) .tag { background: var(--t2); }
+.tile input { border: 0; border-top: 2px solid var(--line); text-align: center; font-size: 20px; font-weight: 600; }
+.tile small { display: block; text-align: center; font-size: 12px; color: var(--muted); padding: 4px 2px 6px; }
+details { margin-top: 14px; }
+summary { cursor: pointer; font-size: 14px; font-weight: 600; }
+.ou { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; max-width: 360px; }
+.err { color: var(--t2); font-weight: 600; margin: 12px 0 0; min-height: 1.5em; }
+
+.verdict { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 2px solid var(--line); margin-bottom: 16px; }
+.verdict > div { padding: 14px 16px; }
+.verdict > div + div { border-left: 2px solid var(--line); }
+.verdict .main { background: var(--t1); color: var(--on-tile); }
+.verdict .main .label { color: var(--on-tile); }
+.label { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.big { font-size: 56px; font-weight: 800; line-height: 1.05; }
+.note { font-size: 14px; margin: 2px 0 0; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 18px; }
+.stat { border: 2px solid var(--line-soft); padding: 10px 12px; }
+.stat b { display: block; font-size: 20px; font-family: Dosis, sans-serif; }
+.cols { display: grid; grid-template-columns: auto 1fr; gap: 24px; align-items: start; }
+table.grid { border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.grid th { font-size: 12px; color: var(--muted); font-weight: 600; padding: 2px 4px; }
+.grid td {
+  width: 46px; height: 40px; text-align: center; font-size: 12px; border: 1px solid var(--line-soft);
+}
+.grid td.pick { outline: 3px solid var(--line); outline-offset: -3px; font-weight: 800; }
+.axis { font-size: 12px; color: var(--muted); margin-top: 6px; }
+ol.top { margin: 0; padding: 0; list-style: none; counter-reset: r; }
+ol.top li {
+  display: grid; grid-template-columns: 28px 52px 1fr 52px; gap: 8px; align-items: center;
+  padding: 6px 0; border-bottom: 1px solid var(--line-soft); font-variant-numeric: tabular-nums;
+}
+ol.top li::before { counter-increment: r; content: counter(r) "."; color: var(--muted); font-size: 13px; }
+ol.top .score { font-family: Dosis, sans-serif; font-weight: 800; font-size: 20px; }
+ol.top .bar { height: 10px; background: var(--tx); }
+ol.top .pct { text-align: right; font-size: 14px; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; align-items: center; }
+button {
+  font: inherit; font-weight: 600; color: var(--on-tile); background: var(--t1); cursor: pointer;
+  border: 2px solid var(--line); border-radius: 2px; padding: 8px 14px;
+}
+button:hover { background: var(--tx); }
+.how { font-size: 15px; }
+.how li { margin-bottom: 6px; }
+footer { font-size: 13px; color: var(--muted); border-top: 2px solid var(--line-soft); padding-top: 14px; }
+footer a { color: inherit; }
+@media (max-width: 640px) {
+  .cols { grid-template-columns: 1fr; }
+  .grid td { width: 38px; height: 34px; font-size: 11px; }
+  .big { font-size: 44px; }
+  .verdict { grid-template-columns: 1fr; }
+  .verdict > div + div { border-left: 0; border-top: 2px solid var(--line); }
+}
+</style>
 </head>
 <body>
-<p>Wird gebaut.</p>
+<main>
+  <div class="kicker">Für Tipmaster-Manager · Prototyp</div>
+  <h1>Tipp-Rechner</h1>
+  <p class="lede">Bei Tipmaster gewinnt, wer näher am echten Ergebnis liegt. Gib die Quoten ein: der Rechner nimmt die Buchmacher-Marge heraus, schätzt die Torerwartung beider Teams und zeigt dir den Tipp, der im Schnitt am wenigsten danebenliegt.</p>
+
+  <section class="panel" aria-labelledby="in-h">
+    <h2 id="in-h">Spiel &amp; Quoten</h2>
+    <div class="teams">
+      <div><label for="home">Heim</label><input id="home" autocomplete="off"></div>
+      <div class="sep" aria-hidden="true">:</div>
+      <div><label for="away">Gast</label><input id="away" autocomplete="off"></div>
+    </div>
+    <div class="odds">
+      <div class="tile"><span class="tag">1</span><input id="q1" inputmode="decimal" aria-label="Quote Heimsieg"><small>Heimsieg</small></div>
+      <div class="tile"><span class="tag">X</span><input id="qx" inputmode="decimal" aria-label="Quote Unentschieden"><small>Remis</small></div>
+      <div class="tile"><span class="tag">2</span><input id="q2" inputmode="decimal" aria-label="Quote Auswärtssieg"><small>Auswärtssieg</small></div>
+    </div>
+    <details id="ou-box">
+      <summary>Optional: Über/Unter 2,5 Tore (macht die Torerwartung genauer)</summary>
+      <div class="ou">
+        <div><label for="qo">Über 2,5</label><input id="qo" inputmode="decimal"></div>
+        <div><label for="qu">Unter 2,5</label><input id="qu" inputmode="decimal"></div>
+      </div>
+    </details>
+    <p class="err" id="err" role="alert"></p>
+  </section>
+
+  <section class="panel" id="out" aria-labelledby="out-h" aria-live="polite">
+    <h2 id="out-h">Dein Tipp</h2>
+    <div class="verdict">
+      <div class="main">
+        <div class="label">Sicherster Tipp</div>
+        <div class="big" id="safe">-</div>
+        <p class="note" id="safe-note"></p>
+      </div>
+      <div>
+        <div class="label">Wahrscheinlichstes Ergebnis</div>
+        <div class="big" id="mode">-</div>
+        <p class="note" id="mode-note"></p>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat"><span class="label">Erwartete Tore</span><b id="xg">-</b></div>
+      <div class="stat"><span class="label">Fair 1 / X / 2</span><b id="fair">-</b></div>
+      <div class="stat"><span class="label">Buchmacher-Marge</span><b id="margin">-</b></div>
+    </div>
+    <div class="cols">
+      <div>
+        <table class="grid" id="grid" aria-label="Wahrscheinlichkeit je Ergebnis in Prozent"></table>
+        <div class="axis">Zeilen: Tore Heim · Spalten: Tore Gast · Rahmen: sicherster Tipp</div>
+      </div>
+      <div>
+        <div class="label" style="margin-bottom:6px">Top 5 Ergebnisse</div>
+        <ol class="top" id="top"></ol>
+        <p class="note" id="fit"></p>
+      </div>
+    </div>
+    <div class="actions">
+      <button id="share" type="button">Link für die Gruppe kopieren</button>
+      <span class="note" id="share-msg" aria-live="polite"></span>
+    </div>
+  </section>
+
+  <section class="panel how" aria-labelledby="how-h">
+    <h2 id="how-h">So rechnet das Tool</h2>
+    <ol>
+      <li><b>Marge raus.</b> Die Kehrwerte der Quoten ergeben zusammen mehr als 100 %. Statt einfach proportional zu kürzen, nutzen wir die Potenz-Methode: Außenseiterquoten enthalten mehr Marge als Favoritenquoten, und das bildet sie ab.</li>
+      <li><b>Torerwartung schätzen.</b> Wir suchen die zwei Poisson-Torerwartungen (Heim, Gast), deren Ergebnis-Wahrscheinlichkeiten am besten zu den fairen 1X2-Werten passen, mit Über/Unter auch zur Torzahl.</li>
+      <li><b>Sicherster Tipp.</b> Tipmaster wertet, wie nah dein Tipp am Ergebnis liegt. Die genaue Formel ist nicht öffentlich, wir messen Nähe als Summe der Tor-Abweichungen (|Heim| + |Gast|) und wählen den Tipp mit dem kleinsten erwarteten Abstand. Der ist oft nicht das wahrscheinlichste Einzelergebnis.</li>
+    </ol>
+  </section>
+
+  <footer>
+    Inoffizieller Prototyp, nicht mit Tipmaster verbunden. Gedacht für das kostenlose Tippspiel, keine Wettempfehlung.
+    Die vorausgefüllten Quoten sind Beispielwerte. Glücksspiel kann süchtig machen: Hilfe unter <a href="https://www.check-dein-spiel.de" rel="noopener">check-dein-spiel.de</a>.
+  </footer>
+</main>
+
+<script>
+const MAXG = 10;
+const DEFAULTS = { home: "FC Bayern München", away: "RB Leipzig", q1: "1,50", qx: "4,75", q2: "5,50", qo: "", qu: "" };
+const FIELDS = Object.keys(DEFAULTS);
+const $ = (id) => document.getElementById(id);
+const pct = (x, d = 1) => (x * 100).toLocaleString("de-DE", { minimumFractionDigits: d, maximumFractionDigits: d }) + " %";
+const dec = (x, d = 2) => x.toLocaleString("de-DE", { minimumFractionDigits: d, maximumFractionDigits: d });
+// German users type "2,10"; accept both separators.
+const num = (v) => { const x = parseFloat(String(v).trim().replace(",", ".")); return Number.isFinite(x) ? x : NaN; };
+
+// Power method: fair p_i = (1/o_i)^k with k chosen so the p_i sum to 1.
+function devig(odds) {
+  const r = odds.map((o) => 1 / o);
+  let lo = 0.05, hi = 20;
+  for (let i = 0; i < 80; i++) {
+    const k = (lo + hi) / 2;
+    const s = r.reduce((a, x) => a + Math.pow(x, k), 0);
+    if (s > 1) lo = k; else hi = k;
+  }
+  const k = (lo + hi) / 2;
+  return { p: r.map((x) => Math.pow(x, k)), margin: r.reduce((a, x) => a + x, 0) - 1 };
+}
+
+function pmf(l) {
+  const p = [Math.exp(-l)];
+  for (let k = 1; k <= MAXG; k++) p.push(p[k - 1] * l / k);
+  return p;
+}
+
+function outcomes(ph, pa) {
+  let H = 0, D = 0, A = 0, O = 0;
+  for (let i = 0; i <= MAXG; i++) for (let j = 0; j <= MAXG; j++) {
+    const v = ph[i] * pa[j];
+    if (i > j) H += v; else if (i === j) D += v; else A += v;
+    if (i + j >= 3) O += v;
+  }
+  return { H, D, A, O };
+}
+
+// Coarse grid then a fine grid around the best point. The objective is cheap
+// and bounded, so brute force is more robust here than a gradient method.
+function fit(t) {
+  const err = (lh, la) => {
+    const o = outcomes(pmf(lh), pmf(la));
+    let e = (o.H - t.H) ** 2 + (o.D - t.D) ** 2 + (o.A - t.A) ** 2;
+    if (t.O != null) e += (o.O - t.O) ** 2;
+    return e;
+  };
+  let best = { lh: 1, la: 1, e: Infinity };
+  for (let lh = 0.1; lh <= 5; lh += 0.05) for (let la = 0.1; la <= 5; la += 0.05) {
+    const e = err(lh, la); if (e < best.e) best = { lh, la, e };
+  }
+  const c = { ...best };
+  for (let lh = c.lh - 0.05; lh <= c.lh + 0.05; lh += 0.005) for (let la = c.la - 0.05; la <= c.la + 0.05; la += 0.005) {
+    if (lh <= 0 || la <= 0) continue;
+    const e = err(lh, la); if (e < best.e) best = { lh, la, e };
+  }
+  return best;
+}
+
+function read() {
+  const s = {}; FIELDS.forEach((f) => (s[f] = $(f).value)); return s;
+}
+
+function syncUrl(s) {
+  const q = new URLSearchParams();
+  FIELDS.forEach((f) => { if (s[f]) q.set(f, s[f]); });
+  history.replaceState(null, "", "?" + q.toString());
+}
+
+function render() {
+  const s = read();
+  syncUrl(s);
+  const odds = [num(s.q1), num(s.qx), num(s.q2)];
+  const out = $("out");
+  if (odds.some((o) => !(o > 1))) {
+    $("err").textContent = "Bitte drei Dezimalquoten größer als 1 eingeben, z. B. 2,10.";
+    out.style.opacity = 0.35; return;
+  }
+  const qo = num(s.qo), qu = num(s.qu);
+  const hasOU = qo > 1 && qu > 1;
+  $("err").textContent = (s.qo || s.qu) && !hasOU ? "Über/Unter braucht beide Quoten; wird ignoriert." : "";
+  out.style.opacity = 1;
+
+  const m = devig(odds);
+  const t = { H: m.p[0], D: m.p[1], A: m.p[2], O: hasOU ? devig([qo, qu]).p[0] : null };
+  const { lh, la } = fit(t);
+  const ph = pmf(lh), pa = pmf(la);
+  const model = outcomes(ph, pa);
+
+  const cells = [];
+  for (let i = 0; i <= MAXG; i++) for (let j = 0; j <= MAXG; j++) cells.push({ i, j, p: ph[i] * pa[j] });
+
+  // Expected closeness distance for every plausible tip.
+  let safe = null;
+  for (let ti = 0; ti <= 6; ti++) for (let tj = 0; tj <= 6; tj++) {
+    let e = 0;
+    for (const c of cells) e += c.p * (Math.abs(ti - c.i) + Math.abs(tj - c.j));
+    const p = ph[ti] * pa[tj];
+    if (!safe || e < safe.e - 1e-9 || (Math.abs(e - safe.e) < 1e-9 && p > safe.p)) safe = { i: ti, j: tj, e, p };
+  }
+  const sorted = [...cells].sort((a, b) => b.p - a.p);
+  const mode = sorted[0];
+
+  const home = s.home || "Heim", away = s.away || "Gast";
+  $("safe").textContent = `${safe.i}:${safe.j}`;
+  $("safe-note").textContent = `Im Schnitt ${dec(safe.e, 1)} Tore daneben, so wenig wie bei keinem anderen Tipp.`;
+  $("mode").textContent = `${mode.i}:${mode.j}`;
+  $("mode-note").textContent = mode.i === safe.i && mode.j === safe.j
+    ? `Trifft in ${pct(mode.p)} der Fälle genau. Hier sind beide Tipps gleich.`
+    : `Trifft in ${pct(mode.p)} der Fälle genau, liegt im Schnitt aber weiter daneben.`;
+  $("xg").textContent = `${dec(lh)} : ${dec(la)}`;
+  $("fair").textContent = m.p.map((p) => pct(p, 0)).join(" / ");
+  $("margin").textContent = pct(m.margin);
+
+  const maxP = sorted[0].p;
+  let html = `<tr><th></th>${[0, 1, 2, 3, 4, 5].map((j) => `<th scope="col">${j}</th>`).join("")}</tr>`;
+  for (let i = 0; i <= 5; i++) {
+    html += `<tr><th scope="row">${i}</th>`;
+    for (let j = 0; j <= 5; j++) {
+      const p = ph[i] * pa[j], a = p / maxP;
+      const pick = i === safe.i && j === safe.j ? " pick" : "";
+      html += `<td class="${pick.trim()}" style="background:rgba(226,80,43,${(a * 0.9).toFixed(3)});color:${a > 0.55 ? "#fff" : "inherit"}" title="${home} ${i}:${j} ${away}: ${pct(p)}">${(p * 100).toFixed(1)}</td>`;
+    }
+    html += "</tr>";
+  }
+  $("grid").innerHTML = html;
+
+  $("top").innerHTML = sorted.slice(0, 5).map((c) =>
+    `<li><span class="score">${c.i}:${c.j}</span><span class="bar" style="width:${(c.p / maxP * 100).toFixed(0)}%"></span><span class="pct">${pct(c.p)}</span></li>`
+  ).join("");
+
+  // Independent Poisson tends to under-predict draws; say so when the fit drifts.
+  const drift = Math.max(Math.abs(model.H - t.H), Math.abs(model.D - t.D), Math.abs(model.A - t.A));
+  $("fit").textContent = drift > 0.02
+    ? `Hinweis: Das Modell weicht bis zu ${dec(drift * 100, 1)} Prozentpunkte von den Quoten ab (Remis: Modell ${pct(model.D, 0)}, Markt ${pct(t.D, 0)}).`
+    : `Das Modell trifft die fairen Quoten auf ${dec(drift * 100, 1)} Prozentpunkte genau.`;
+}
+
+const params = new URLSearchParams(location.search);
+FIELDS.forEach((f) => { $(f).value = params.has(f) ? params.get(f) : DEFAULTS[f]; });
+if (params.get("qo") || params.get("qu")) $("ou-box").open = true;
+FIELDS.forEach((f) => $(f).addEventListener("input", render));
+
+$("share").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(location.href); $("share-msg").textContent = "Link kopiert. Ab in den Gruppenchat."; }
+  catch { $("share-msg").textContent = location.href; }
+});
+
+render();
+</script>
 </body>
 </html>
