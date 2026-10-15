@@ -40,6 +40,11 @@ h2 { font-size: 20px; margin: 0 0 12px; font-weight: 800; text-transform: upperc
 .panel {
   background: var(--surface); border: 2px solid var(--line); padding: 20px; margin-bottom: 20px;
   clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%);
+  position: relative;
+}
+.panel::before {
+  content: ""; position: absolute; top: -2px; right: -2px; width: 18px; height: 18px;
+  background: linear-gradient(to bottom left, transparent calc(50% - 2px), var(--line) calc(50% - 2px) calc(50% + 2px), transparent calc(50% + 2px));
 }
 .teams { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: end; margin-bottom: 16px; }
 .teams .sep { font-family: Dosis, sans-serif; font-weight: 800; font-size: 22px; padding-bottom: 8px; }
@@ -193,7 +198,7 @@ footer a { color: inherit; }
 
 <script>
 const MAXG = 10;
-const DEFAULTS = { home: "FC Bayern München", away: "RB Leipzig", q1: "1,50", qx: "4,75", q2: "5,50", qo: "", qu: "" };
+const DEFAULTS = { home: "FC Bayern München", away: "RB Leipzig", q1: "1,40", qx: "5,00", q2: "7,00", qo: "", qu: "" };
 const FIELDS = Object.keys(DEFAULTS);
 const $ = (id) => document.getElementById(id);
 const pct = (x, d = 1) => (x * 100).toLocaleString("de-DE", { minimumFractionDigits: d, maximumFractionDigits: d }) + " %";
@@ -313,7 +318,7 @@ function render() {
     for (let j = 0; j <= 5; j++) {
       const p = ph[i] * pa[j], a = p / maxP;
       const pick = i === safe.i && j === safe.j ? " pick" : "";
-      html += `<td class="${pick.trim()}" style="background:rgba(226,80,43,${(a * 0.9).toFixed(3)});color:${a > 0.55 ? "#fff" : "inherit"}" title="${home} ${i}:${j} ${away}: ${pct(p)}">${(p * 100).toFixed(1)}</td>`;
+      html += `<td class="${pick.trim()}" style="background:rgba(226,80,43,${(a * 0.9).toFixed(3)});color:${a > 0.55 ? "#fff" : "inherit"}" title="${home} ${i}:${j} ${away}: ${pct(p)}">${dec(p * 100, 1)}</td>`;
     }
     html += "</tr>";
   }
